@@ -18,3 +18,9 @@ resource "aws_route_table" "sp-rtb-pub" {
     Name = "${var.project_name}-public-rtb"
   }
 }
+
+
+resource "aws_route_table_association" "sp-rtb-assoc-pub" {
+  subnet_id      = aws_subnet.sp-sub-pub.id
+  route_table_id = aws_route_table.sp-rtb-pub.id
+}
