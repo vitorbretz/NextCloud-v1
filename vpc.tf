@@ -7,7 +7,7 @@ resource "aws_vpc" "sp-vpc" {
   }
 }
 
-resource "aws_subnet" "sub-pub" {
+resource "aws_subnet" "sp-sub-pub" {
   vpc_id                  = aws_vpc.sp-vpc.id
   availability_zone       = "sa-east-1a"
   cidr_block              = "10.0.0.0/24"
