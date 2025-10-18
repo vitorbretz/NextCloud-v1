@@ -1,17 +1,27 @@
 resource "aws_instance" "sp-ec2" {
-  ami           = "ami-0de716d6197524dd9"
-  instance_type = "m5.2xlarge"
-  tags = {
-    Name = "${var.project_name}-ec2"
-  }
+  depends_on = [
+    aws_security_group.sg-ec2,
+    aws_security_group.sg-alb
+  ]
+
+  ami                         = "ami-0ba39aef11896824a"
+  instance_type               = "m5.2xlarge"
   subnet_id                   = aws_subnet.sp-sub-pub.id
   associate_public_ip_address = true
   key_name                    = "acessa-infra-antiga"
-  vpc_security_group_ids      = ["sg-084b9164d6d82c597"] #Editar conforme o uso
+
+  # Usa o SG criado no Terraform
+  vpc_security_group_ids = [aws_security_group.sg-ec2.id]
+
   root_block_device {
     volume_size = 500
     volume_type = "gp2"
   }
+
+  tags = {
+    Name = "${var.project_name}-ec2"
+  }
+
   user_data = <<-EOF
 #!/bin/bash
 
@@ -44,7 +54,7 @@ echo "/swapfile swap swap defaults 0 0" | tee -a /etc/fstab
 curl -fsSL https://rpm.nodesource.com/setup_21.x | bash -
 yum install -y nodejs
 
-# Instalar Python 3.11 (para Amazon Linux 2, precisa do repositório correto)
+# Instalar Python 3.11
 amazon-linux-extras enable python3.11
 yum install -y python3.11
 ln -sf /usr/bin/python3.11 /usr/bin/python3
