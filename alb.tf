@@ -2,8 +2,8 @@
 resource "aws_lb" "nextcloud" {
   name               = "nextcloud-alb"
   load_balancer_type = "application"
-  security_groups    = [aws]
-  subnets            = aws_subnet.sp-sub-pub.id
+  security_groups    = [aws_security_group.sg-alb.id]
+  subnets            = [aws_subnet.sp-sub-pub.id]
 
   enable_deletion_protection = false
   internal                   = false
