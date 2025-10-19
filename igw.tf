@@ -20,7 +20,11 @@ resource "aws_route_table" "sp-rtb-pub" {
 }
 
 
-resource "aws_route_table_association" "sp-rtb-assoc-pub" {
-  subnet_id      = aws_subnet.sp-sub-pub.id
+resource "aws_route_table_association" "sp-rtb-assoc-pub-1a" {
+  subnet_id      = aws_subnet.sp-sub-pub-1a.id
+  route_table_id = aws_route_table.sp-rtb-pub.id
+}
+resource "aws_route_table_association" "sp-rtb-assoc-pub-1b" {
+  subnet_id      = aws_subnet.sp-sub-pub-1b.id
   route_table_id = aws_route_table.sp-rtb-pub.id
 }

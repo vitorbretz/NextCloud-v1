@@ -5,8 +5,8 @@ data "http" "meu_ip" {
 
 # Security Group da EC2
 resource "aws_security_group" "sg-ec2" {
-  name        = "sg-ec2"
-  description = "Acesso à EC2 apenas via ALB e SSH do meu IP"
+  name        = "security-ec2"
+  description = "Acesso a EC2 apenas via ALB e SSH do meu IP"
   vpc_id      = aws_vpc.sp-vpc.id
 
   # Saída liberada para qualquer destino
@@ -19,12 +19,13 @@ resource "aws_security_group" "sg-ec2" {
 
   # Acesso vindo apenas do ALB
   ingress {
-    description     = "Acesso do ALB"
-    from_port       = 0
-    to_port         = 65535
-    protocol        = "tcp"
-    security_groups = [aws_security_group.sg-alb.id]
-  }
+  description     = "Acesso HTTP do ALB"
+  from_port       = 80
+  to_port         = 80
+  protocol        = "tcp"
+  security_groups = [aws_security_group.sg-alb.id]
+}
+
 
   # Acesso SSH apenas do seu IP público atual
   ingress {
@@ -36,14 +37,14 @@ resource "aws_security_group" "sg-ec2" {
   }
 
   tags = {
-    Name = "sg-ec2"
+    Name = "security-ec2"
   }
 }
 
 # Security Group do ALB
 resource "aws_security_group" "sg-alb" {
-  name        = "sg-alb"
-  description = "Acesso público ao ALB"
+  name        = "security-alb"
+  description = "Acesso publico ao ALB"
   vpc_id      = aws_vpc.sp-vpc.id
 
   # Saída liberada
@@ -73,6 +74,6 @@ resource "aws_security_group" "sg-alb" {
   }
 
   tags = {
-    Name = "sg-alb"
+    Name = "security-alb"
   }
 }

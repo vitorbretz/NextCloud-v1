@@ -6,7 +6,7 @@ resource "aws_instance" "sp-ec2" {
 
   ami                         = "ami-0ba39aef11896824a"
   instance_type               = "m5.2xlarge"
-  subnet_id                   = aws_subnet.sp-sub-pub.id
+  subnet_id                   = aws_subnet.sp-sub-pub-1a.id
   associate_public_ip_address = true
   key_name                    = "acessa-infra-antiga"
 
@@ -24,8 +24,11 @@ resource "aws_instance" "sp-ec2" {
 
   user_data = <<-EOF
 #!/bin/bash
+# Redireciona logs de inicialização para arquivo e console
+exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
+set -x
 
-# Atualizar pacotes
+# Atualizar pacotes do sistema
 yum update -y
 
 # Instalar Docker e Git
@@ -33,7 +36,7 @@ yum install -y git docker
 usermod -a -G docker ec2-user
 usermod -a -G docker ssm-user
 
-# Ativar Docker
+# Habilitar e iniciar Docker
 systemctl enable docker
 systemctl start docker
 
@@ -43,14 +46,7 @@ curl -SL https://github.com/docker/compose/releases/download/v2.23.3/docker-comp
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-# Adicionar swap
-dd if=/dev/zero of=/swapfile bs=128M count=32
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
-echo "/swapfile swap swap defaults 0 0" | tee -a /etc/fstab
-
-# Instalar Node.js e npm
+# Instalar Node.js (última versão LTS)
 curl -fsSL https://rpm.nodesource.com/setup_21.x | bash -
 yum install -y nodejs
 
@@ -59,8 +55,18 @@ amazon-linux-extras enable python3.11
 yum install -y python3.11
 ln -sf /usr/bin/python3.11 /usr/bin/python3
 
-# Instalar uv
+# Instalar 'uv' (gerenciador de ambiente Python)
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Entrar no diretório do ec2-user
+cd /home/ec2-user
+
+# Clonar o repositório
+git https://github.com/henrylle/proj-nextcloud.git /home/ec2-user/proj-nextcloud
+cd /home/ec2-user/proj-nextcloud
+
+# Subir containers com Docker Compose
+sudo docker compose up -d
 
 EOF
 }
