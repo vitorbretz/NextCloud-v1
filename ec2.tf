@@ -62,7 +62,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 cd /home/ec2-user
 
 # Clonar o repositório
-git https://github.com/henrylle/proj-nextcloud.git /home/ec2-user/proj-nextcloud
+git clone https://github.com/henrylle/proj-nextcloud.git /home/ec2-user/proj-nextcloud
 cd /home/ec2-user/proj-nextcloud
 
 # Subir containers com Docker Compose
