@@ -77,3 +77,33 @@ resource "aws_security_group" "sg-alb" {
     Name = "security-alb"
   }
 }
+
+
+# Security Group Aurora
+
+resource "aws_security_group" "sg-aurora" {
+  name        = "security-aurora"
+  description = "Acesso ao Aurora PostgreSQL apenas pela EC2"
+  vpc_id      = aws_vpc.sp-vpc.id
+
+  # Saída liberada
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Entrada PostgreSQL (5432) apenas da EC2
+  ingress {
+    description     = "Acesso PostgreSQL apenas da EC2"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.sg-ec2.id]
+  }
+
+  tags = {
+    Name = "security-aurora"
+  }
+}
