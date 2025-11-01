@@ -1,0 +1,157 @@
+1: # Correção da Aplicação Nextcloud com EFS
++      2:
++      3: ## Problema Identificado
++      4: - Aplicação retornando erro 503 para requisições normais
++      5: - Health check funcionando, mas interface principal inacessível
++      6: - Problemas de permissão com volumes EFS
++      7:
++      8: ## Diagnóstico Executado
++      9:
++     10: ### 1. Verificação do status dos containers
++     11: 
+
+Bash
+
++     12: docker ps -a
++     13: 
+
++     14:
++     15: ### 2. Análise dos logs
++     16: 
+
+Bash
+
++     17: docker logs proj-nextcloud-nc-1 --tail 50
++     18: 
+
++     19:
++     20: ### 3. Verificação do EFS
++     21: 
+
+Bash
+
++     22: df -h | grep efs
++     23: ls -la /mnt/efs/
++     24: ls -la /mnt/efs/nextcloud/
++     25: 
+
++     26:
++     27: ## Correções Aplicadas
++     28:
++     29: ### 1. Parar a aplicação
++     30: 
+
+Bash
+
++     31: docker compose down
++     32: 
+
++     33:
++     34: ### 2. Corrigir permissões do EFS
++     35: 
+
+Bash
+
++     36: sudo chown -R 33:33 /mnt/efs/nextcloud/
++     37: 
+
++     38:
++     39: ### 3. Atualizar compose.yml
++     40: Antes:
++     41: 
+
+YAML
+
++     42: services:
++     43:   nc:
++     44:     image: nextcloud:apache
++     45:     environment:
++     46:       - POSTGRES_HOST=aurora-postgres-dev.cluster-c9226ous4oya.sa-east-1.rds.amazonaws.com
++     47:       - POSTGRES_PASSWORD=MySecurePass123!
++     48:       - POSTGRES_DB=nextcloud
++     49:       - POSTGRES_USER=nextcloud
++     50:     ports:
++     51:       - 80:80
++     52:     restart: always
++     53:     volumes:
++     54:       - /mnt/efs/nextcloud/html:/var/www/html
++     55:       - /mnt/efs/nextcloud/config:/var/www/html/config
++     56:       - /mnt/efs/nextcloud/data:/var/www/html/data
++     57: 
+
++     58:
++     59: Depois:
++     60: 
+
+YAML
+
++     61: services:
++     62:   nc:
++     63:     image: nextcloud:apache
++     64:     environment:
++     65:       - POSTGRES_HOST=aurora-postgres-dev.cluster-c9226ous4oya.sa-east-1.rds.amazonaws.com
++     66:       - POSTGRES_PASSWORD=MySecurePass123!
++     67:       - POSTGRES_DB=nextcloud
++     68:       - POSTGRES_USER=nextcloud
++     69:       - NEXTCLOUD_TRUSTED_DOMAINS=*
++     70:     ports:
++     71:       - 80:80
++     72:     restart: always
++     73:     volumes:
++     74:       - /mnt/efs/nextcloud/html:/var/www/html
++     75:     user: "33:33"
++     76: 
+
++     77:
++     78: ### 4. Reiniciar a aplicação
++     79: 
+
+Bash
+
++     80: docker compose up -d
++     81: 
+
++     82:
++     83: ### 5. Verificar funcionamento
++     84: 
+
+Bash
+
++     85: sleep 10 && docker logs proj-nextcloud-nc-1 --tail 20
++     86: curl -I http://localhost/
++     87: docker ps
++     88: 
+
++     89:
++     90: ## Principais Mudanças
++     91:
++     92: 1. User ID: Definido user: "33:33" (www-data)
++     93: 2. Volumes: Simplificado para apenas /var/www/html
++     94: 3. Trusted Domains: Adicionado NEXTCLOUD_TRUSTED_DOMAINS=*
++     95: 4. Permissões: Corrigido ownership no EFS
++     96:
++     97: ## Resultado
++     98: - Aplicação funcionando corretamente
++     99: - Redirecionamento para /login (HTTP 302)
++    100: - Container rodando sem erros
++    101: - EFS montado e acessível
++    102:
++    103: ## Verificação Final
++    104: 
+
+Bash
+
++    105: # Status do container
++    106: docker ps
++    107:
++    108: # Teste de conectividade
++    109: curl -I http://localhost/
++    110:
++    111: # Logs em tempo real
++    112: docker logs -f proj-nextcloud-nc-1
++    113: 
+
+
+ ⋮
+ ↳ Purpose: Documentar correções aplicadas na aplicação Nextcloud com EFS
+Creating: /home/ec2-user/proj-nextcloud/TROUBLESHOOTING_EFS.md

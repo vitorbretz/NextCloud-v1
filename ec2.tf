@@ -24,39 +24,72 @@ resource "aws_instance" "sp-ec2" {
 
   user_data = <<-EOF
 #!/bin/bash
-# Redireciona logs de inicialização para arquivo e console
-exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
-set -x
+set -euxo pipefail
+# ------------------------------------------------------------
+# SCRIPT SEGURO E OTIMIZADO PARA AMAZON LINUX 2023
+# Objetivo: preparar EC2 para uso com Docker, AWS CLI, Node.js e Python
+# ------------------------------------------------------------
 
-# Atualizar pacotes do sistema
-yum update -y
+# --- Atualização básica do sistema ---
+# Evita travar o yum/dnf se rodar durante o boot
+sleep 10
+sudo dnf clean all
+sudo dnf update -y
 
-# Instalar Docker e Git
-yum install -y git docker
-usermod -a -G docker ec2-user
-usermod -a -G docker ssm-user
+# --- Instalar pacotes essenciais ---
+sudo dnf install -y git docker jq unzip curl tar
 
-# Habilitar e iniciar Docker
-systemctl enable docker
-systemctl start docker
+# --- Instalar AWS CLI v2 ---
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+unzip -q /tmp/awscliv2.zip -d /tmp
+sudo /tmp/aws/install --update
+rm -rf /tmp/aws /tmp/awscliv2.zip
 
-# Instalar Docker Compose v2
-mkdir -p /usr/local/lib/docker/cli-plugins
-curl -SL https://github.com/docker/compose/releases/download/v2.23.3/docker-compose-linux-x86_64 \
-  -o /usr/local/lib/docker/cli-plugins/docker-compose
-chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+# --- Configurar Docker ---
+sudo systemctl enable docker.service
+sudo systemctl start docker.service
+sudo usermod -aG docker ec2-user
+sudo usermod -aG docker ssm-user
 
-# Instalar Node.js (última versão LTS)
-curl -fsSL https://rpm.nodesource.com/setup_21.x | bash -
-yum install -y nodejs
+# --- Instalar Docker Compose v2 ---
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl -fsSL "https://github.com/docker/compose/releases/download/v2.23.3/docker-compose-linux-x86_64" \
+    -o /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-# Instalar Python 3.11
-amazon-linux-extras enable python3.11
-yum install -y python3.11
-ln -sf /usr/bin/python3.11 /usr/bin/python3
+# --- Instalar Node.js 21 ---
+curl -fsSL https://rpm.nodesource.com/setup_21.x | sudo bash -
+sudo dnf install -y nodejs
 
-# Instalar 'uv' (gerenciador de ambiente Python)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# --- Instalar Python 3.10 e configurar ---
+sudo dnf install -y python3.10
+sudo ln -sf /usr/bin/python3.10 /usr/bin/python3
+
+# --- Instalar UV (gerenciador de pacotes para Python, compatível com MCP da AWS) ---
+sudo -u ec2-user bash -c '
+  export PATH="$HOME/.local/bin:$PATH"
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  echo "export PATH=\$HOME/.local/bin:\$PATH" >> /home/ec2-user/.bashrc
+'
+
+# --- Corrigir DNS persistente (caso perca resolução) ---
+# Essa configuração impede perda de /etc/resolv.conf após updates
+sudo bash -c 'cat > /etc/systemd/resolved.conf <<EOF
+[Resolve]
+DNS=8.8.8.8 1.1.1.1
+FallbackDNS=9.9.9.9
+DNSStubListener=no
+EOF'
+sudo systemctl enable systemd-resolved
+sudo systemctl restart systemd-resolved
+sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+
+# --- Log final ---
+echo "Setup concluído com sucesso em $(date)" | sudo tee /var/log/setup-complete.log
+
+# ------------------------------------------------------------
+# COMANDOS ADICIONAIS: CLONAR REPOSITÓRIO NEXTCLOUD E SUBIR CONTAINERS
+# ------------------------------------------------------------
 
 # Entrar no diretório do ec2-user
 cd /home/ec2-user
@@ -67,6 +100,8 @@ cd /home/ec2-user/proj-nextcloud
 
 # Subir containers com Docker Compose
 sudo docker compose up -d
+
+
 
 EOF
 }

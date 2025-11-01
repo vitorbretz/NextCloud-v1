@@ -1,0 +1,154 @@
+## Cenário: Nextcloud já funcionando com banco local
+
+## 1. Fazer backup do banco local
+bash
+cd /home/ec2-user/proj-nextcloud
+
+# Criar script de backup/restore
+cat > backup_restore.sh << 'EOF'
+#!/bin/bash
+
+PGUSER_LOCAL="nextcloud"
+PGDATABASE_LOCAL="nextcloud"
+PGPASSWORD_LOCAL="nextcloud"
+
+PGHOST_RDS="aurora-postgres-dev.cluster-c9226ous4oya.sa-east-1.rds.amazonaws.com"
+PGPORT_RDS="5432"
+PGUSER_RDS="nextcloud"
+PGDATABASE_RDS="nextcloud"
+PGPASSWORD_RDS="MySecurePass123!"
+
+DUMP_FILE="nextcloud_dump.sql"
+
+echo "Fazendo dump do banco local..."
+docker exec -e PGPASSWORD=$PGPASSWORD_LOCAL proj-nextcloud-db-1 pg_dump -U $PGUSER_LOCAL -d $PGDATABASE_LOCAL -f /tmp/$DUMP_FILE
+docker cp proj-nextcloud-db-1:/tmp/$DUMP_FILE .
+
+echo "Preparando banco no RDS..."
+docker run --rm -e PGPASSWORD=$PGPASSWORD_RDS postgres:alpine psql -h $PGHOST_RDS -U $PGUSER_RDS -d postgres -c "DROP DATABASE IF EXISTS $PGDATABASE_RDS;"
+docker run --rm -e PGPASSWORD=$PGPASSWORD_RDS postgres:alpine psql -h $PGHOST_RDS -U $PGUSER_RDS -d postgres -c "CREATE DATABASE $PGDATABASE_RDS;"
+
+echo "Restaurando no RDS..."
+docker run --rm -v $(pwd)/$DUMP_FILE:/tmp/$DUMP_FILE -e PGPASSWORD=$PGPASSWORD_RDS postgres:alpine psql -h $PGHOST_RDS -U $PGUSER_RDS -d $PGDATABASE_RDS -f /tmp/$DUMP_FILE
+
+echo "Backup e restore concluídos!"
+EOF
+
+chmod +x backup_restore.sh
+
+
+## 2. Executar backup/restore
+bash
+./backup_restore.sh
+
+
+## 3. Verificar se dados foram migrados
+bash
+docker run --rm -e PGPASSWORD=MySecurePass123! postgres:alpine psql \
+  -h aurora-postgres-dev.cluster-c9226ous4oya.sa-east-1.rds.amazonaws.com \
+  -U nextcloud \
+  -d nextcloud \
+  -c "\dt" | head -10
+
+
+## 4. Parar aplicação atual
+bash
+docker compose down
+
+
+## 5. Atualizar compose para RDS
+bash
+cat > compose.yml << 'EOF'
+services:
+  nc:
+    image: nextcloud:apache
+    environment:
+      - POSTGRES_HOST=aurora-postgres-dev.cluster-c9226ous4oya.sa-east-1.rds.amazonaws.com
+      - POSTGRES_PASSWORD=MySecurePass123!
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextcloud
+    ports:
+      - 80:80
+    restart: always
+    volumes:
+      - nc_data:/var/www/html
+
+volumes:
+  nc_data:
+EOF
+
+
+exi
+bash
+docker compose up -d
+sleep 15
+
+
+## 7. Configurar config.php para RDS
+bash
+docker exec -i proj-nextcloud-nc-1 sh -c 'cat > /var/www/html/config/config.php << "EOF"
+<?php
+$CONFIG = array (
+  "htaccess.RewriteBase" => "/",
+  "memcache.local" => "\\OC\\Memcache\\APCu",
+  "apps_paths" =>
+  array (
+    0 =>
+    array (
+      "path" => "/var/www/html/apps",
+      "url" => "/apps",
+      "writable" => false,
+    ),
+    1 =>
+    array (
+      "path" => "/var/www/html/custom_apps",
+      "url" => "/custom_apps",
+      "writable" => true,
+    ),
+  ),
+  "instanceid" => "ocayyucq2ct9",
+  "passwordsalt" => "Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej",
+  "secret" => "Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej",
+  "trusted_domains" =>
+  array (
+    0 => "localhost",
+    1 => "127.0.0.1",
+    2 => "*",
+  ),
+  "datadirectory" => "/var/www/html/data",
+  "dbtype" => "pgsql",
+  "version" => "32.0.1.2",
+  "overwrite.cli.url" => "http://localhost",
+  "dbname" => "nextcloud",
+  "dbhost" => "aurora-postgres-dev.cluster-c9226ous4oya.sa-east-1.rds.amazonaws.com",
+  "dbport" => "",
+  "dbtableprefix" => "oc_",
+  "dbuser" => "nextcloud",
+  "dbpassword" => "MySecurePass123!",
+  "installed" => true,
+);
+EOF'
+
+
+## 8. Testar aplicação
+bash
+curl -I http://localhost
+
+
+Resultado esperado: HTTP 302 Found (redirecionamento para /login)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+## Resumo dos comandos em sequência:
+bash
+cd /home/ec2-user/proj-nextcloud
+# Criar script backup_restore.sh (passo 1)
+chmod +x backup_restore.sh
+./backup_restore.sh
+docker compose down
+# Atualizar compose.yml (passo 5)
+docker compose up -d
+sleep 15
+# Configurar config.php (passo 7)
+curl -I http://localhost

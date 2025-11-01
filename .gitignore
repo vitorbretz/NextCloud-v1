@@ -1,6 +1,10 @@
 # Local .terraform directories
 .terraform/
 .terraform.lock.hcl
+01-backup_restore/
+02.config.efs/
+03.config.vcp_peering/
+
 
 # .tfstate files
 *.tfstate

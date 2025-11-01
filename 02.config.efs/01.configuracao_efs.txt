@@ -1,0 +1,46 @@
+2️⃣ Copiar tudo para o EFS
+
+Quando confirmar o caminho (substitua abaixo se for diferente):
+
+sudo rsync -avh --progress /var/lib/docker/volumes/proj-nextcloud_nc_data/_data/ /mnt/efs/nextcloud/html/
+
+
+Esse comando:
+
+Copia todos os arquivos do Nextcloud para o EFS,
+
+Mantém permissões e estrutura,
+
+Mostra o progresso.
+
+3️⃣ Ajustar permissões
+
+Depois da cópia terminar:
+
+sudo chown -R 33:33 /mnt/efs/nextcloud
+sudo chmod -R 755 /mnt/efs/nextcloud
+
+4️⃣ Atualizar o compose.yml para o EFS
+
+Depois de copiar, edite o compose.yml para:
+
+volumes:
+  - /mnt/efs/nextcloud/html:/var/www/html
+  - /mnt/efs/nextcloud/config:/var/www/html/config
+  - /mnt/efs/nextcloud/data:/var/www/html/data
+
+
+E reinicie:
+
+docker-compose down
+docker-compose up -d
+
+5️⃣ Confirmar
+
+Dentro do container:
+
+docker exec -it proj-nextcloud-nc-1 bash
+df -h | grep html
+
+
+➡️ Deve mostrar /var/www/html montado no EFS (10.0.0.23:/mnt/efs/...).

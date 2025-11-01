@@ -107,3 +107,29 @@ resource "aws_security_group" "sg-aurora" {
     Name = "security-aurora"
   }
 }
+
+resource "aws_security_group" "next_cloud_efs" {
+  name        = "security-efs-nextcloud"
+  description = "acesso efs"
+  vpc_id      = "vpc-02723adfc847525c56"
+
+  ingress {
+    description      = "acesso bia-dev"
+    from_port        = 2049
+    to_port          = 2049
+    protocol         = "tcp"
+    security_groups  = ["aws_security_group.sg-ec2.id"]
+  }
+
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "next-cloud-efs-us-east-1"
+  }
+}

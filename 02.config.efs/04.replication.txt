@@ -1,0 +1,91 @@
+_2. Via Console AWS:
+
+1. Acesse o EFS Console na região de São Paulo (sa-east-1)
+2. Selecione o EFS fs-0736c468520e3b993 (efs-nextcloud)
+3. Clique na aba "Replication"
+4. Clique em "Create replication"
+5. Configure:
+   • Destination region: us-east-1 (N. Virginia)
+   • Availability zone: us-east-1a (opcional)
+   • Storage class: Standard (padrão)
+6. Clique "Create replication"
+
+
+
+
+
+ou
+
+
+
+
+
+## 1. Criação do EFS na Virgínia
+bash
+aws efs create-file-system --region us-east-1 --encrypted
+# Resultado: fs-0a2c1e0c31b8b5f73
+
+
+## 2. Identificação da infraestrutura existente
+bash
+# Listei VPCs na Virgínia
+aws ec2 describe-vpcs --region us-east-1
+
+# Identifiquei a VPC: vpc-02c949af9ebf3df4b (next-cloud-V2-us-vpc)
+# Listei subnets dessa VPC
+aws ec2 describe-subnets --region us-east-1 --filters Name=vpc-id,Values=vpc-02c949af9ebf3df4b
+
+
+## 3. Criação do Security Group
+bash
+# Criei SG para EFS
+aws ec2 create-security-group --region us-east-1 \
+  --group-name efs-cross-region-sg \
+  --vpc-id vpc-02c949af9ebf3df4b \
+  --description "Security group for EFS cross-region sync"
+
+# Resultado: sg-082443bd909eb7e6b
+
+# Permiti tráfego NFS (porta 2049)
+aws ec2 authorize-security-group-ingress --region us-east-1 \
+  --group-id sg-082443bd909eb7e6b \
+  --protocol tcp --port 2049 --cidr 10.0.0.0/8
+
+
+## 4. Criação dos Mount Targets
+bash
+# Mount target na subnet privada 1a
+aws efs create-mount-target --region us-east-1 \
+  --file-system-id fs-0a2c1e0c31b8b5f73 \
+  --subnet-id subnet-00f668c1865abd2a9 \
+  --security-groups sg-082443bd909eb7e6b
+
+# Mount target na subnet privada 1b
+aws efs create-mount-target --region us-east-1 \
+  --file-system-id fs-0a2c1e0c31b8b5f73 \
+  --subnet-id subnet-052691a2b7e6ea88e \
+  --security-groups sg-082443bd909eb7e6b
+
+
+## 5. Script de Sincronização
+bash
+#!/bin/bash
+# Montar EFS São Paulo
+sudo mount -t efs -o tls,regional fs-0736c468520e3b993.efs.sa-east-1.amazonaws.com:/ /mnt/efs-sp
+
+# Montar EFS Virgínia
+sudo mount -t efs -o tls,regional fs-0a2c1e0c31b8b5f73.efs.us-east-1.amazonaws.com:/ /mnt/efs-va
+
+# Sincronizar com rsync
+rsync -avz --progress --delete /mnt/efs-sp/ /mnt/efs-va/
+
+
+## 6. Automação com Cron
+bash
+# Instalar cron
+sudo yum install -y cronie
+sudo systemctl enable crond && sudo systemctl start crond
+
+# Configurar job para executar a cada hora
+crontab -e
+# Adicionar: 0 * * * * /home/ec2-user/efs-final-sync.sh

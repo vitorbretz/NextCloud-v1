@@ -1,0 +1,87 @@
+## 1. Criar VPC Peering Connection
+
+bash
+# Na região do requester (sa-east-1)
+aws ec2 create-vpc-peering-connection \
+    --vpc-id vpc-01f3f9e34aeb00b93 \
+    --peer-vpc-id vpc-02c949af9ebf3df4b \
+    --peer-region us-east-1 \
+    --region sa-east-1
+
+
+## 2. Aceitar VPC Peering Connection
+
+bash
+# Na região do accepter (us-east-1)
+aws ec2 accept-vpc-peering-connection \
+    --vpc-peering-connection-id pcx-008589c38a30e9adf \
+    --region us-east-1
+
+
+## 3. Configurar Route Tables
+
+### Região sa-east-1 (Requester)
+bash
+# Route table pública
+aws ec2 create-route \
+    --route-table-id rtb-09180a8c5e770999b \
+    --destination-cidr-block 10.1.0.0/22 \
+    --vpc-peering-connection-id pcx-008589c38a30e9adf \
+    --region sa-east-1
+
+# Route table privada
+aws ec2 create-route \
+    --route-table-id rtb-0dadd38aabd953f69 \
+    --destination-cidr-block 10.1.0.0/22 \
+    --vpc-peering-connection-id pcx-008589c38a30e9adf \
+    --region sa-east-1
+
+
+### Região us-east-1 (Accepter)
+bash
+# Route table pública
+aws ec2 create-route \
+    --route-table-id rtb-0eef5ed1de907e4e7 \
+    --destination-cidr-block 10.0.0.0/22 \
+    --vpc-peering-connection-id pcx-008589c38a30e9adf \
+    --region us-east-1
+
+# Route table privada
+aws ec2 create-route \
+    --route-table-id rtb-065aeb27241765f69 \
+    --destination-cidr-block 10.0.0.0/22 \
+    --vpc-peering-connection-id pcx-008589c38a30e9adf \
+    --region us-east-1
+
+
+## 4. Verificar Configuração
+
+bash
+# Verificar status do peering
+aws ec2 describe-vpc-peering-connections \
+    --vpc-peering-connection-ids pcx-008589c38a30e9adf \
+    --region us-east-1
+
+# Verificar route tables
+aws ec2 describe-route-tables \
+    --route-table-ids rtb-0eef5ed1de907e4e7 rtb-065aeb27241765f69 \
+    --region us-east-1
+
+
+## 5. Configurar Security Groups
+
+bash
+# Permitir tráfego entre VPCs nos security groups
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-04fa0b77ef9613406 \
+    --protocol tcp \
+    --port 22 \
+    --cidr 10.0.0.0/22 \
+    --region us-east-1
+
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-00639761586014635 \
+    --protocol tcp \
+    --port 22 \
+    --cidr 10.1.0.0/22 \
+    --region sa-east-1
